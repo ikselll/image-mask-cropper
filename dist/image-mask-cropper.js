@@ -54,11 +54,15 @@
     /**
      * DOMHandler class fot manipulating DOM.
      * 
-     * @param {object} superClass instance of imageMaskCropper
+     * @param  {object} superClass instance of imageMaskCropper
      * @return {void}
      */
     var DOMHandler = function (superClass) {
         this.super = superClass;
+
+        this.$container = null;
+        this.$imageMain = null;
+        this.$imageMask = null;
 
         this.init();
     };
@@ -73,41 +77,100 @@
          * @return {void}
          */
         init: function () {
-            this._insertIntoContainer();
+            this._insertElementsIntoContainer();
         },
         /**
-         * Inserts or replaces container with new $element.
+         * Inserts img elements into created container.
          * 
          * @return {void}
          */
-        _insertIntoContainer: function () {
-            var $container = null,
-                cClass = this.super.settings.cropperContainerClass;
-
+        _insertElementsIntoContainer: function () {
+            if (this._areImagesInitialized() === false) {
+                this._createNewImageInstances();
+            }
             if (this._isContainerExisting() === false) {
-                $container = $('<div/>').addClass(cClass).insertAfter(this.super.$element);
-                this.super.$element.appendTo($container);
+                this._createContainer();
+            }
+
+            this.$imageMain.appendTo(this.$container);
+            if (this.$imageMask !== null) {
+                this.$imageMask.appendTo(this.$container);
+            }
+        },
+        /**
+         * Checks if images are assigned to DOMHandler.
+         * 
+         * @return {boolean}
+         */
+        _areImagesInitialized: function() {
+            return ((this.super.imageMain !== null && this.$imageMain !== null) ||
+                    (this.super.imageMask !== null && this.$imageMask !== null))
+        },
+        /**
+         * Crates new Image instance (also adds image tag into DOM with proper classes).
+         * 
+         * @return {void}
+         */
+        _createNewImageInstances: function() {
+            if (this.super.imageMain !== null) {
+                this.$imageMain = this.super.$element;
+                this.$imageMain.addClass(this.super.settings.imageMainClass);
+            }
+            if (this.super.imageMask !== null) {
+                this.$imageMask = $('<img>').attr('src', this.super.imageMask.src).addClass(this.super.settings.imageMaskClass);
+            }
+            this._applyImagesCSS();
+        },
+        /**
+         * Applies CSS into given image.
+         * 
+         * @return {boolean}
+         */
+        _applyImagesCSS: function () {
+            if (this.$imageMask === null) {
+                this.$imageMain.css({
+                    position: 'static'
+                });
             }
             else {
-                $('.' + cClass).append(this.super.$element);
+                this.$imageMain.css({
+                    position: 'absolute'
+                });
+                this.$imageMask.css({
+                    position: 'relative'
+                });
             }
         },
         /**
          * Checks if container is already in DOM.
          * 
-         * @return {boolean} [description]
+         * @return {boolean}
          */
         _isContainerExisting: function () {
             var cClass = this.super.settings.cropperContainerClass;
             return ($('.' + cClass).length > 0 && $('.' + cClass).contains(this.super.$element));
-        }
+        },
+        /**
+         * Creates the container div baed in cropperContainerClass.
+         * 
+         * @return {void}
+         */
+        _createContainer: function () {
+            var cClass = this.super.settings.cropperContainerClass;
+            this.$container = $('<div/>').addClass(cClass).insertAfter(this.super.$element);
+
+            this._applyContainerCss();
+        },
         /**
          * Applies CSS into parent container.
          * 
          * @return {void}
          */
         _applyContainerCss: function () {
-            
+            this.$container.css({
+                overflow: 'hidden',
+                position: 'relative'
+            });
         }
     };
     /**
@@ -304,7 +367,7 @@
     $.fn.imageMaskCropper = function (options) {
         var settings = $.extend({}, $.fn.imageMaskCropper.defaults, options);
 
-        this.maskCropperInstance = new imageMaskCropper(settings, this);
+        window.maskCropperInstance = this.maskCropperInstance = new imageMaskCropper(settings, this);
         return this;
     };
     /**
@@ -314,7 +377,9 @@
      */
     $.fn.imageMaskCropper.defaults = {
         maskImage: '',
-        cropperContainerClass: 'image-mask-cropper'
+        cropperContainerClass: 'image-mask-cropper',
+        imageMainClass: 'cropper-image-main',
+        imageMaskClass: 'cropper-image-mask'
     };
     /* <--END: plugin core-->  */
 }));
