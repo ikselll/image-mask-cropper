@@ -54,7 +54,7 @@
      * @return {promise}
      */
     var loadImage = function (src) {
-        return $.get(src);
+        return $('<img>').attr('src', src).load();
     };
     /**
      * eventHandler class for retrieve /drag events.
@@ -154,14 +154,14 @@
          */
         init: function () {
             this._insertElementsIntoContainer();
-            this.initEvents();
+            this._initEvents();
         },
         /**
          * Images Events initialization.
          * 
          * @return {void}
          */
-        initEvents: function () {
+        _initEvents: function () {
             this.eventHandler = new eventHandler(this);
         },
         /**
@@ -184,6 +184,8 @@
             });
             this._appendImage('imageMain');
             this._appendImage('imageMask');
+
+            this._fitImageToMask();
         },
         /**
          * Checks if images are assigned to DOMHandler.
@@ -264,17 +266,76 @@
          */
         _applyImagesCSS: function () {
             if (this.$imageMask === null) {
-                this.$imageMain.css({
+                this.$imageMain.removeAttr('style').css({
                     position: 'static'
                 });
             }
             else {
-                this.$imageMain.css({
+                this.$imageMain.removeAttr('style').css({
                     position: 'absolute'
                 });
-                this.$imageMask.css({
-                    position: 'relative'
+                this.$imageMask.removeAttr('style').css({
+                    position: 'relative',
+                    width: '100%'
                 });
+            }
+        },
+        /**
+         * Fits image into mask procentage values
+         * 
+         * @return {void}
+         */
+        _fitImageToMask: function () {
+            var self = this,
+                options = null;
+
+            if (self.$imageMask === null) {
+                return false;
+            }
+            options = (function(dataMaskOptions) {
+                if (typeof dataMaskOptions === 'string') {
+                    return JSON.parse(dataMaskOptions);
+                }
+                return self.super.settings.maskOptions;
+            })(self.super.$element.attr('data-mask-options'));
+
+            if (self.$imageMain.height() > self.$imageMain.width()) {
+                self.$imageMain.css({
+                    width: options.width + '%',
+                    left: options.left + '%'
+                });
+            }
+            else {
+                self.$imageMain.css({
+                    height: options.height + '%',
+                    top: options.top + '%'
+                });
+            }
+            self._centerImageToMask();
+        },
+        /**
+         * Centers main image based on mask size.
+         * 
+         * @return {void}
+         */
+        _centerImageToMask: function () {
+            var self = this,
+                imgProp = self.$imageMain.width() / self.$imageMain.height() * 100,
+                options = null;
+
+            if (self.$imageMask === null) {
+                return false;
+            }
+
+            options = (function(dataMaskOptions) {
+                if (typeof dataMaskOptions === 'string') {
+                    return JSON.parse(dataMaskOptions);
+                }
+                return self.super.settings.maskOptions;
+            })(self.super.$element.attr('data-mask-options'));
+
+            if (self.$imageMain.height() > self.$imageMain.width()) {
+                
             }
         },
         /**
@@ -566,11 +627,15 @@
      */
     $.fn.imageMaskCropper.defaults = {
         maskImage: '',
+        /**
+         * PercentageValues
+         * @type oObject}
+         */
         maskOptions: {
             left: 0,
             right: 0,
-            width: 0,
-            height: 0
+            width: 100,
+            height: 100
         },
         cropperContainerClass: 'image-mask-cropper',
         imageMainClass: 'cropper-image-main',
