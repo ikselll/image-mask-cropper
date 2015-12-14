@@ -29,7 +29,12 @@
         2, //isRunning
         4, //Done
         8 //ImagesFailed
-    ];
+    ],
+    /**
+     * Avaliable types of images.
+     * @type {array}
+     */
+    avaliableTypes = ['imageMain', 'imageMask'];
     /**
      * Sets status if is avaliable in global statuses.
      * 
@@ -52,7 +57,76 @@
         return $.get(src);
     };
     /**
-     * DOMHandler class fot manipulating DOM.
+     * eventHandler class for retrieve /drag events.
+     * 
+     * @param  {object} superClass instance of DOMHandler
+     * @return {void}
+     */
+    var eventHandler = function (superClass) {
+        var self = this;
+
+        self.super = superClass;
+        self.$elToMove = (function() {
+            if (self.super.$imageMask === null) {
+                return;//cropelement
+            }
+            return self.super.$imageMain;
+        })();
+
+        self.maskOptions = (function(dataMaskOptions) {
+             if (typeof dataMaskOptions === 'string') {
+                return JSON.parse(dataMaskOptions);
+             }
+             return self.super.super.settings.maskOptions;
+        })(self.super.super.$element.attr('data-mask-options'));
+
+        self.initEvents();
+    }
+    /**
+     * eventHandler methods.
+     * @type {object}
+     */
+    eventHandler.prototype = {
+        /**
+         * Initialization methods.
+         * 
+         * @return {void}
+         */
+        initEvents: function () {
+            this._onMove();
+        },
+        _onMove: function () {
+            var startMousePos = null;
+
+            $(document).on('mousedown touchstart', this.super.$container, function (e) {
+                e.preventDefault();
+                startMousePos = {
+                    x: e.pageX,
+                    y: e.pageY
+                };
+            });
+
+            $(document).on('mousemove touchmove', this.super.$container, function (e) {
+                e.preventDefault();
+                var diff = {
+                    x: 0,
+                    y: 0
+                };
+                if (startMousePos !== null) {
+                    diff.x = startMousePos.x - e.pageX;
+                    diff.y = startMousePos.y - e.pageY;
+                }
+            });
+
+            $(document).on('mouseup touchend', this.super.$container, function (e) {
+                e.preventDefault();
+
+                startMousePos = null;
+            });
+        }
+    };
+    /**
+     * DOMHandler class for manipulating DOM.
      * 
      * @param  {object} superClass instance of imageMaskCropper
      * @return {void}
@@ -63,6 +137,8 @@
         this.$container = null;
         this.$imageMain = null;
         this.$imageMask = null;
+
+        this.eventHandler = null;
 
         this.init();
     };
@@ -78,6 +154,15 @@
          */
         init: function () {
             this._insertElementsIntoContainer();
+            this.initEvents();
+        },
+        /**
+         * Images Events initialization.
+         * 
+         * @return {void}
+         */
+        initEvents: function () {
+            this.eventHandler = new eventHandler(this);
         },
         /**
          * Inserts img elements into created container.
@@ -88,14 +173,17 @@
             if (this._areImagesInitialized() === false) {
                 this._createNewImageInstances();
             }
+            else {
+                this._changeImageInstances();   
+            }
             if (this._isContainerExisting() === false) {
                 this._createContainer();
             }
-
-            this.$imageMain.appendTo(this.$container);
-            if (this.$imageMask !== null) {
-                this.$imageMask.appendTo(this.$container);
-            }
+            this.super.$element.css({
+                display: 'none'
+            });
+            this._appendImage('imageMain');
+            this._appendImage('imageMask');
         },
         /**
          * Checks if images are assigned to DOMHandler.
@@ -113,12 +201,60 @@
          */
         _createNewImageInstances: function() {
             if (this.super.imageMain !== null) {
-                this.$imageMain = this.super.$element;
-                this.$imageMain.addClass(this.super.settings.imageMainClass);
+                this.$imageMain = this._createImage('imageMain');
             }
             if (this.super.imageMask !== null) {
-                this.$imageMask = $('<img>').attr('src', this.super.imageMask.src).addClass(this.super.settings.imageMaskClass);
+                this.$imageMask = this._createImage('imageMask');
             }
+            this._applyImagesCSS();
+        },
+        /**
+         * Creates DOM image based on parameter.
+         *
+         * @param  {string} imageType type of dom image
+         * @return {object} jquery image
+         */
+        _createImage: function (imageType) {
+            if (avaliableTypes.indexOf(imageType) === -1) {
+                throw new Error('Cannot create dom image with wrong image type!')
+            }
+            return $('<img>').attr('src', this.super[imageType].src).addClass(this.super.settings[imageType + 'Class']);
+        },
+        /**
+         * Appends image into container.
+         * 
+         * @param  {string} imageType type of dom image
+         * @return {void}
+         */
+        _appendImage: function (imageType) {
+            if (avaliableTypes.indexOf(imageType) === -1) {
+                throw new Error('Cannot append dom image with wrong image type!')
+            }
+            if (this['$' + imageType] !== null) {
+                this['$' + imageType].appendTo(this.$container);
+            }
+        },
+        /**
+         * Changes src of images used in plugin.
+         * 
+         * @return {void}
+         */
+        _changeImageInstances: function () {
+            var self = this;
+            avaliableTypes.forEach(function (image) {
+                if (self.super[image] !== null && self.super[image] !== null) {
+                    if (self['$' + image].length === 0) {
+                        self['$' + image] = this._createImage(image);
+                        self._appendImage(image);
+                    }
+                    self['$' + image].attr('src', self.super[image].src);
+                }
+                else {
+                    self['$' + image].remove();
+                    self['$' + image] = null;
+                }
+            });
+
             this._applyImagesCSS();
         },
         /**
@@ -148,7 +284,7 @@
          */
         _isContainerExisting: function () {
             var cClass = this.super.settings.cropperContainerClass;
-            return ($('.' + cClass).length > 0 && $('.' + cClass).contains(this.super.$element));
+            return ($('.' + cClass).length > 0 && this.super.$element.parent().find($('.' + cClass)));
         },
         /**
          * Creates the container div baed in cropperContainerClass.
@@ -181,8 +317,7 @@
      * @return {object} proper ~image Object
      */
     var ImageObject = function (type, src) {
-        var imageObject = {},
-            avaliableTypes = ['imageMain', 'imageMask'];
+        var imageObject = {};
 
         Object.defineProperties(imageObject, {
             'type': {
@@ -232,6 +367,7 @@
         this.status = 1;
 
         this.init();
+        this.initEvents();
     };
     /**
      * imageMaskCropper methods.
@@ -247,9 +383,12 @@
         init: function () {
             var self = this;
 
+            if (this.status === 2) {
+                throw new Error ('Application is processing! Try in few seconds later');
+            }
+
             this._checkElementLengthCorrect();
             this._checkElementTypeCorrect();
-            
             this.createImages();
 
             setStatus.call(this, 2);
@@ -260,6 +399,15 @@
             }).always(function () {
                 self.initDOM();
             });
+        },
+        /**
+         * Initializes main plugin events.
+         * 
+         * @return {void}
+         */
+        initEvents: function () {
+          this._onChangeImageMain();
+          this._onChangeImageMask();
         },
         /**
          * Executes prv functions to check existance of its attrs and initializes them.
@@ -304,7 +452,48 @@
             if (this.status !== 4) {
                 throw new Error('Cannot set DOM because images haven\'t loaded properly.')
             }
-            this.DOMHandler = new DOMHandler(this);
+            if (this.DOMHandler === null) {
+                this.DOMHandler = new DOMHandler(this);
+            }
+            else {
+                this.DOMHandler.init();
+            }
+        },
+        /**
+         * Events changes main image src.
+         * 
+         * @return {void}
+         */
+        _onChangeImageMain: function () {
+            var self = this;
+            this.$element.on('imageMaskCropper:self:ChangeImageMain', function (e, imageSrc) {
+                self.$element.attr({
+                    src: imageSrc
+                });
+                self.init();
+            });
+        },
+        /**
+         * Event changes maks image attr.
+         * 
+         * @return {void}
+         */
+        _onChangeImageMask: function () {
+            var self = this;
+            /**
+             * @param {string|null} imageSrc (if null is given, than Image is removed)
+             */
+            this.$element.on('imageMaskCropper:self:ChangeImageMask', function (e, imageSrc) {
+                if (imageSrc === null) {
+                    self.$element.removeAttr('data-mask-image');
+                }
+                else {
+                    self.$element.attr({
+                        'data-mask-image': imageSrc
+                    });
+                }
+                self.init();
+            });
         },
         /**
          * Checks if there is one DOM element of its selector.
@@ -377,9 +566,15 @@
      */
     $.fn.imageMaskCropper.defaults = {
         maskImage: '',
+        maskOptions: {
+            left: 0,
+            right: 0,
+            width: 0,
+            height: 0
+        },
         cropperContainerClass: 'image-mask-cropper',
         imageMainClass: 'cropper-image-main',
-        imageMaskClass: 'cropper-image-mask'
+        imageMaskClass: 'cropper-image-mask',
     };
     /* <--END: plugin core-->  */
 }));
